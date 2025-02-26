@@ -1,0 +1,53 @@
+{
+    "shopping": [
+        {
+            "name": "Shopping Mall 1",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt1.png"
+        },
+        {
+            "name": "Shopping Mall 2",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt2.png"
+        },
+        {
+            "name": "Shopping Mall 3",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt3.png"
+        },
+        {
+            "name": "Shopping Mall 4",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt4.png"
+        },
+        {
+            "name": "Shopping Mall 5",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt5.png"
+        }
+    ],
+    "education": [
+        {
+            "name": "Virtual University 1",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt1.png"
+        },
+        {
+            "name": "Virtual University 2",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt2.png"
+        },
+        {
+            "name": "Virtual University 3",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt3.png"
+        }
+    ],
+    "art": [
+        {
+            "name": "Art Gallery",
+            "url": "secondlife:///app/teleport/OML-Welcome/128/128/22",
+            "image": "destinations/Infopunkt1.png"
+        }
+    ]
+}
