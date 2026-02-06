@@ -4,6 +4,8 @@ Achtung der neue Evats Kalender ist nicht kompatibel zum alten, alle einträge m
 
 Eine anleitung zum Evats Kalender gibt es hier: <https://github.com/ManfredAabye/oswebinterface/blob/main/Events.md>
 
+Der neue Kalender kann mehrere Einträge pro Tag anzeigen und diese im Internet Browser sowie OpenSim Viewer auf der Welcome Seite anzeigen.
+
 <img src="https://raw.githubusercontent.com/ManfredAabye/oswebinterface/refs/heads/main/include/oswebinterfaceK1.png" alt="Project Badge" width="680">
 
 **OpenSimulator Viewer Webinterface:**
@@ -90,6 +92,7 @@ Die Datei `env.php` enthält alle sensiblen Zugangsdaten und Umgebungsvariablen 
   ---
 
   
+
 
 
 
