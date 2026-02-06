@@ -150,18 +150,30 @@ include_once "include/config.php";
                             $output .= '<h2>' . htmlspecialchars($xml->channel->title) . '</h2>';
                             //$output .= '<p><a href="' . htmlspecialchars($xml->channel->link) . '">Feed öffnen</a></p>';
 
-                            // Nur den neuesten Eintrag anzeigen
-                            $entry = $xml->channel->item[0];
-                            $date = date('d.m.Y', strtotime($entry->pubDate));
-                            $title = htmlspecialchars($entry->title);
-                            $description = html_entity_decode($entry->description);
-                            if (isset($entry->encoded)) {
-                                $description .= '<br>' . html_entity_decode($entry->encoded);
-                            } else if (isset($entry->content)) {
-                                $description .= '<br>' . html_entity_decode($entry->content);
+                            // Alle Einträge des Feeds anzeigen
+                            foreach ($xml->channel->item as $entry) {
+                                $date = date('d.m.Y', strtotime($entry->pubDate));
+                                $title = htmlspecialchars($entry->title);
+                                $description = html_entity_decode($entry->description);
+                                $time = '';
+                                if (preg_match('/\d{2}:\d{2}/', $entry->pubDate, $matches)) {
+                                    $time = $matches[0];
+                                }
+                                $image = '';
+                                if (isset($entry->enclosure) && $entry->enclosure['url']) {
+                                    $image = htmlspecialchars($entry->enclosure['url']);
+                                }
+                                if (isset($entry->encoded)) {
+                                    $description .= '<br>' . html_entity_decode($entry->encoded);
+                                } else if (isset($entry->content)) {
+                                    $description .= '<br>' . html_entity_decode($entry->content);
+                                }
+                                $output .= '<p><a href="'.htmlspecialchars($entry->link).'" title="'.$date.'">'. $title .'</a> <small>(' . $date . ($time ? ' ' . $time : '') . ')</small></p>';
+                                if ($image) {
+                                    $output .= '<div><img src="'.$image.'" alt="Event-Bild" style="max-width:120px;max-height:120px;" /></div>';
+                                }
+                                $output .= '<div>'. $description .'</div>';
                             }
-                            $output .= '<p><a href="'.htmlspecialchars($entry->link).'" title="'.$date.'">'. $title .'</a> <small>('.$date.')</small></p>';
-                            $output .= '<div>'. $description .'</div>';
                         }
 
                         echo $output;

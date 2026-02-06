@@ -77,12 +77,17 @@
         /* Event-Container am Ende der Zelle */
         .event { 
             font-size: 0.8em; 
-            background-color: rgba(255, 255, 255, 0.7); /* Transparenter Hintergrund */
+            background-color: rgba(0, 0, 0, 0.7); /* Weniger Transparenz, schwarzer Hintergrund */
             padding: 2px 4px; 
             border-radius: 3px; 
             margin-top: auto; /* Nach unten schieben */
             text-align: center; 
             z-index: 1; 
+        }
+        
+        /* Event-Box mit Bild als Hintergrund */
+        .event.has-bgimg .event-content {
+            background: rgba(0, 0, 0, 0.7); /* Weniger Transparenz, schwarzer Hintergrund */
         }
         
         /* Event-Textzeile */
@@ -119,6 +124,34 @@
             text-align: center; 
             display: block; 
             margin-top: auto; 
+        }
+
+        /* Event-Bild als Hintergrundbild der Zelle */
+        .event.has-bgimg {
+            background-size: cover !important;
+            background-position: center !important;
+            min-height: 120px;
+            min-width: 120px;
+            position: relative;
+        }
+        /* .event.has-bgimg .event-content {
+            position: relative;
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 6px;
+            padding: 4px;
+            margin: 0;
+        } */
+        .event.has-bgimg a.event-img-link, .event.has-bgimg img.event-img {
+            display: none !important;
+        }
+
+        /* Abstand zwischen Tageseinträgen (Events) */
+        .events-container .event {
+            margin-bottom: 4px;
+        }
+        .events-container .event:last-child {
+            margin-bottom: 0;
         }
     </style>
 </head>
@@ -214,57 +247,86 @@
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateCell = document.createElement('div');
                 dateCell.classList.add('date');
-                
+
                 // Tag-Nummer hinzufügen
                 const dateNumber = document.createElement('div');
                 dateNumber.classList.add('date-number');
                 dateNumber.textContent = day;
                 dateCell.appendChild(dateNumber);
 
-                // Event für diesen Tag suchen
-                const event = events.find(e => 
-                    new Date(e.date).toDateString() === new Date(year, month, day).toDateString()
-                );
-                
-                // Wenn ein Event existiert, Details hinzufügen
-                if (event) {
-                    // Hintergrundbild falls vorhanden
-                    if (event.image) {
-                        const imageContainer = document.createElement('div');
-                        imageContainer.classList.add('image-container');
-                        const img = document.createElement('img');
-                        img.src = event.image;
-                        imageContainer.appendChild(img);
-                        dateCell.appendChild(imageContainer);
-                    }
-
-                    // Hintergrundfarbe falls definiert
-                    if (event.color) {
-                        dateCell.style.backgroundColor = event.color;
-                    }
-
-                    // Textfarbe falls definiert
-                    if (event.txtcolor) {
-                        dateCell.style.color = event.txtcolor;
-                    }
-
-                    // Event-Texte hinzufügen (erste Zeile fett)
-                    event.texts.forEach((text, index) => {
-                        const eventTextElement = document.createElement('div');
-                        eventTextElement.classList.add('event-text');
-                        if (index === 0) {
-                            eventTextElement.classList.add('event-text-bold');
+                // Alle Events für diesen Tag suchen (verschachteltes Format)
+                const dateStr = new Date(year, month, day).toISOString().slice(0, 10);
+                const dayEntry = events.find(e => e.date === dateStr);
+                if (dayEntry && Array.isArray(dayEntry.events)) {
+                    // Container für alle Events dieses Tages
+                    const eventsContainer = document.createElement('div');
+                    eventsContainer.classList.add('events-container');
+                    dayEntry.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                    dayEntry.events.forEach(event => {
+                        // Einzelnes Event-Element
+                        const eventBlock = document.createElement('div');
+                        eventBlock.classList.add('event');
+                        // Bild als Hintergrund, falls vorhanden
+                        if (event.image) {
+                            eventBlock.classList.add('has-bgimg');
+                            eventBlock.style.backgroundImage = `url('${event.image}')`;
                         }
-                        eventTextElement.textContent = text;
-                        dateCell.appendChild(eventTextElement);
+                        // Container für Event-Inhalt (Text, Uhrzeit, Link)
+                        const eventContent = document.createElement('div');
+                        eventContent.classList.add('event-content');
+                        // Uhrzeit
+                        if (event.time) {
+                            const timeElement = document.createElement('span');
+                            timeElement.classList.add('event-text', 'event-time');
+                            timeElement.style.fontWeight = 'bold';
+                            timeElement.textContent = event.time + ' ';
+                            eventContent.appendChild(timeElement);
+                        }
+                        // Event-Texte (erste Zeile fett)
+                        if (event.texts) {
+                            event.texts.forEach((text, index) => {
+                                const eventTextElement = document.createElement('span');
+                                eventTextElement.classList.add('event-text');
+                                if (index === 0) eventTextElement.classList.add('event-text-bold');
+                                eventTextElement.textContent = text + ' ';
+                                eventContent.appendChild(eventTextElement);
+                            });
+                        }
+                        // Link
+                        if (event.link) {
+                            const lastWord = event.link.split('/').pop();
+                            const linkElement = document.createElement('a');
+                            linkElement.href = event.link;
+                            linkElement.target = '_blank';
+                            linkElement.classList.add('event-link');
+                            linkElement.textContent = lastWord;
+                            eventContent.appendChild(linkElement);
+                        }
+                        // Bild als Link (nur für Klick, nicht sichtbar, aber für Originalbild im neuen Tab)
+                        if (event.image) {
+                            const link = document.createElement('a');
+                            link.href = event.image;
+                            link.target = '_blank';
+                            link.rel = 'noopener noreferrer';
+                            link.classList.add('event-img-link');
+                            // Unsichtbares Bild für Accessibility (optional)
+                            const img = document.createElement('img');
+                            img.src = event.image;
+                            img.classList.add('event-img');
+                            img.alt = 'Event Bild';
+                            img.style.width = '1px';
+                            img.style.height = '1px';
+                            img.style.opacity = '0';
+                            link.appendChild(img);
+                            eventContent.appendChild(link);
+                        }
+                        // Farben (optional)
+                        if (event.color) eventBlock.style.backgroundColor = event.color;
+                        if (event.txtcolor) eventBlock.style.color = event.txtcolor;
+                        eventBlock.appendChild(eventContent);
+                        eventsContainer.appendChild(eventBlock);
                     });
-
-                    // Event-Link hinzufügen (letzter Teil der URL als Text)
-                    const eventElement = document.createElement('div');
-                    eventElement.classList.add('event');
-                    const lastWord = event.link.split('/').pop(); // Letzten URL-Teil extrahieren
-                    eventElement.innerHTML = `<a href="${event.link}" target="_blank" class="event-link">${lastWord}</a>`;
-                    dateCell.appendChild(eventElement);
+                    dateCell.appendChild(eventsContainer);
                 }
 
                 // Fertige Zelle zum Kalender hinzufügen

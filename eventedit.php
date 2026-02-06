@@ -1,4 +1,3 @@
-
 <?php
 // Passwortschutz und Session-Start Datei: eventedit.php
 // Dieser Bereich schützt den Event-Editor mit einem Passwort und startet die Session.
@@ -66,16 +65,25 @@ if (!isset($_SESSION['authenticated'])) {
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
-    $events = json_decode($_POST['events'], true);
+    $eventsByDate = json_decode($_POST['events'], true);
     $filename = $_POST['filename'] ?? 'events.json';
     $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename); // Sicherheit: nur erlaubte Zeichen
     $filepath = 'calendar/' . $filename;
     $backupFilename = $filename . '_' . date('Y-m-d_H-i-s') . '.bak.json';
 
-    // Events nach Datum sortieren (aufsteigend)
-    usort($events, function($a, $b) {
+    // EventsByDate nach Datum sortieren (aufsteigend)
+    usort($eventsByDate, function($a, $b) {
         return strcmp($a['date'], $b['date']);
     });
+    // Innerhalb jedes Tages die Events nach Zeit sortieren
+    foreach ($eventsByDate as &$day) {
+        if (isset($day['events']) && is_array($day['events'])) {
+            usort($day['events'], function($a, $b) {
+                return strcmp($a['time'] ?? '', $b['time'] ?? '');
+            });
+        }
+    }
+    unset($day);
 
     // Datei anlegen, falls sie nicht existiert
     if (!file_exists($filepath)) {
@@ -86,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
         echo "<script>alert('Events erfolgreich gespeichert!');</script>";
     }
     // Events speichern
-    if (file_put_contents($filepath, json_encode($events, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
+    if (file_put_contents($filepath, json_encode($eventsByDate, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
         echo "<script>alert('Fehler beim Speichern der Datei!');</script>";
     }
 }
@@ -120,6 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
         <div class="input-group">
             <label for="event-date">Datum:</label>
             <input type="date" id="event-date" />
+        </div>
+        <div class="input-group">
+            <label for="event-time">Uhrzeit (z.B. 18:00):</label>
+            <input type="time" id="event-time" />
         </div>
         <div class="input-group">
             <label for="event-image">Bild URL:</label>
@@ -159,18 +171,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
     </div>
 
     <script>
-        // JavaScript: Event-Verwaltung und UI-Funktionen
-        // events-Array hält alle geladenen und hinzugefügten Events
-        let events = [];
+        // JavaScript: Event-Verwaltung und UI-Funktionen für verschachtelte Events
+        // eventsByDate ist ein Array von {date, events: [ ... ]}
+        let eventsByDate = [];
 
         // Events aus der JSON-Datei laden und anzeigen (Dateiname wählbar)
         async function fetchEvents() {
             const filename = document.getElementById('event-filename').value || 'events.json';
             try {
                 const response = await fetch('calendar/' + filename);
-                events = await response.json();
+                const data = await response.json();
+                // Prüfen, ob verschachteltes Format (date, events)
+                if (Array.isArray(data) && data.length > 0 && data[0].events) {
+                    eventsByDate = data;
+                } else {
+                    // Migration: Falls altes Format, umwandeln
+                    eventsByDate = [];
+                    data.forEach(ev => {
+                        let found = eventsByDate.find(e => e.date === ev.date);
+                        if (!found) {
+                            found = { date: ev.date, events: [] };
+                            eventsByDate.push(found);
+                        }
+                        found.events.push({
+                            time: ev.time || '',
+                            image: ev.image,
+                            texts: ev.texts,
+                            link: ev.link,
+                            color: ev.color,
+                            txtcolor: ev.txtcolor
+                        });
+                    });
+                }
             } catch (e) {
-                events = [];
+                eventsByDate = [];
             }
             displayEvents();
         }
@@ -179,44 +213,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
         function displayEvents() {
             const eventList = document.getElementById('event-list');
             eventList.innerHTML = '';
-            events.forEach((event, index) => {
-                const eventItem = document.createElement('div');
-                eventItem.classList.add('event-item');
-                eventItem.innerHTML = `
-                    <h3>${event.date}</h3>
-                    <p><strong>Bild URL:</strong> ${event.image}</p>
-                    <p><strong>Texte:</strong> ${event.texts.join(', ')}</p>
-                    <p><strong>Link:</strong> <a href="${event.link}" target="_blank">${event.link}</a></p>
-                    <p><strong>Hintergrundfarbe:</strong> <span style="background-color:${event.color}; padding: 2px 5px;">${event.color}</span></p>
-                    <p><strong>Schriftfarbe:</strong> <span style="background-color:${event.txtcolor}; padding: 2px 5px;">${event.txtcolor}</span></p>
-                    <button onclick="deleteEvent(${index})">Löschen</button>
-                `;
-                eventList.appendChild(eventItem);
+            eventsByDate.sort((a, b) => a.date.localeCompare(b.date));
+            eventsByDate.forEach((day, dayIdx) => {
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('event-item');
+                let html = `<h3>${day.date}</h3>`;
+                day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                day.events.forEach((ev, evIdx) => {
+                    html += `<div style="margin-left:1em; border-left:2px solid #ccc; padding-left:0.5em; margin-bottom:0.5em;">
+                        <strong>Zeit:</strong> ${ev.time || ''}<br>
+                        <strong>Bild URL:</strong> ${ev.image}<br>
+                        <strong>Texte:</strong> ${(ev.texts||[]).join(', ')}<br>
+                        <strong>Link:</strong> <a href="${ev.link}" target="_blank">${ev.link}</a><br>
+                        <strong>Hintergrundfarbe:</strong> <span style="background-color:${ev.color}; padding: 2px 5px;">${ev.color}</span><br>
+                        <strong>Schriftfarbe:</strong> <span style="background-color:${ev.txtcolor}; padding: 2px 5px;">${ev.txtcolor}</span><br>
+                        <button onclick="deleteEvent(${dayIdx},${evIdx})">Löschen</button>
+                    </div>`;
+                });
+                dayDiv.innerHTML = html;
+                eventList.appendChild(dayDiv);
             });
         }
 
         // Neues Event aus den Eingabefeldern hinzufügen
         function addEvent() {
             const date = document.getElementById('event-date').value;
+            const time = document.getElementById('event-time').value;
             const image = document.getElementById('event-image').value;
-            const texts = document.getElementById('event-texts').value.split(',');
+            const texts = document.getElementById('event-texts').value.split(',').map(t => t.trim()).filter(Boolean);
             const link = document.getElementById('event-link').value;
             const color = document.getElementById('event-color').value;
             const txtcolor = document.getElementById('event-txtcolor').value;
 
             if (date && texts.length > 0 && link) {
-                // Prüfen, ob ein Event mit dem gleichen Datum existiert
-                const index = events.findIndex(event => event.date === date);
-                const newEvent = { date, image, texts, link, color, txtcolor };
-                if (index !== -1) {
-                    // Event ersetzen
-                    events[index] = newEvent;
-                } else {
-                    // Neues Event anhängen
-                    events.push(newEvent);
+                let day = eventsByDate.find(e => e.date === date);
+                if (!day) {
+                    day = { date, events: [] };
+                    eventsByDate.push(day);
                 }
-                // Nach Datum sortieren (aufsteigend)
-                events.sort((a, b) => a.date.localeCompare(b.date));
+                // Prüfen, ob Event mit gleicher Zeit existiert
+                const idx = day.events.findIndex(ev => ev.time === time);
+                const newEvent = { time, image, texts, link, color, txtcolor };
+                if (idx !== -1) {
+                    day.events[idx] = newEvent;
+                } else {
+                    day.events.push(newEvent);
+                }
+                // Nach Zeit sortieren
+                day.events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                // Nach Datum sortieren
+                eventsByDate.sort((a, b) => a.date.localeCompare(b.date));
                 displayEvents();
             } else {
                 alert('Bitte alle Felder ausfüllen.');
@@ -224,8 +270,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
         }
 
         // Event aus der Liste löschen
-        function deleteEvent(index) {
-            events.splice(index, 1);
+        function deleteEvent(dayIdx, evIdx) {
+            eventsByDate[dayIdx].events.splice(evIdx, 1);
+            if (eventsByDate[dayIdx].events.length === 0) {
+                eventsByDate.splice(dayIdx, 1);
+            }
             displayEvents();
         }
 
@@ -234,12 +283,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
             return JSON.stringify(json, null, 2);
         }
 
-        // Events als Datei herunterladen
-
         // Events als Datei herunterladen (Dateiname wählbar)
         function downloadEvents() {
             const filename = document.getElementById('event-filename').value || 'events.json';
-            const formattedEvents = formatJSON(events);
+            const formattedEvents = formatJSON(eventsByDate);
             const blob = new Blob([formattedEvents], { type: 'application/json' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
@@ -247,12 +294,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
             link.click();
         }
 
-        // Events an den Server senden und speichern (optional)
-
         // Events an den Server senden und speichern (Dateiname wählbar)
         async function saveEvents() {
             const filename = document.getElementById('event-filename').value || 'events.json';
-            const formattedEvents = formatJSON(events);
+            const formattedEvents = formatJSON(eventsByDate);
             const formData = new FormData();
             formData.append('events', formattedEvents);
             formData.append('filename', filename);
