@@ -1,6 +1,6 @@
 # oswebinterface
 
-Achtung der neue Evats Kalender ist nicht kompatibel zum alten alle einträge müssen erneuert werden.
+Achtung der neue Evats Kalender ist nicht kompatibel zum alten, alle einträge müssen erneuert werden.
 
 Eine anleitung zum Evats Kalender gibt es hier: <https://github.com/ManfredAabye/oswebinterface/blob/main/Events.md>
 
@@ -90,6 +90,7 @@ Die Datei `env.php` enthält alle sensiblen Zugangsdaten und Umgebungsvariablen 
   ---
 
   
+
 
 
 
