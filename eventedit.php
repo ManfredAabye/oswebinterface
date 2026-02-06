@@ -1,13 +1,16 @@
+
 <?php
-// Passwortschutz
+// Passwortschutz und Session-Start Datei: eventedit.php
+// Dieser Bereich schützt den Event-Editor mit einem Passwort und startet die Session.
 session_start();
 
 $title = "Event Editor Service";
 include_once 'include/header.php';
 
+
+// Authentifizierung: Passwort prüfen und Session setzen
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $input_password = $_POST['password'] ?? '';
-
     // Überprüfen des Passworts
     if (in_array($input_password, $registration_passwords_events)) {
         $_SESSION['authenticated'] = true;
@@ -16,12 +19,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+
+// Logout-Funktion: Session beenden und zurück zum Login
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
     session_destroy();
-    header("Location: eventedit.php"); // Wo ist dieser Editor.
+    header("Location: eventedit.php");
     exit;
 }
 
+
+// Login-Formular anzeigen, wenn nicht authentifiziert
 if (!isset($_SESSION['authenticated'])) {
 ?>
 <!DOCTYPE html>
@@ -53,13 +60,35 @@ if (!isset($_SESSION['authenticated'])) {
     exit;
 }
 
-// Funktion zum Speichern der Events in einer JSON-Datei
+
+
+// Funktion zum Speichern der Events in einer JSON-Datei mit wählbarem Dateinamen
+
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
     $events = json_decode($_POST['events'], true);
-    $backupFilename = 'events_' . date('Y-m-d_H-i-s') . '.bak.json';
-    copy('calendar/events.json', $backupFilename);
-    file_put_contents('calendar/events.json', json_encode($events, JSON_PRETTY_PRINT));
-    echo "<script>alert('Events erfolgreich gespeichert!');</script>";
+    $filename = $_POST['filename'] ?? 'events.json';
+    $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename); // Sicherheit: nur erlaubte Zeichen
+    $filepath = 'calendar/' . $filename;
+    $backupFilename = $filename . '_' . date('Y-m-d_H-i-s') . '.bak.json';
+
+    // Events nach Datum sortieren (aufsteigend)
+    usort($events, function($a, $b) {
+        return strcmp($a['date'], $b['date']);
+    });
+
+    // Datei anlegen, falls sie nicht existiert
+    if (!file_exists($filepath)) {
+        file_put_contents($filepath, json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        echo "<script>alert('Datei wurde neu angelegt und Events gespeichert!');</script>";
+    } else {
+        copy($filepath, 'calendar/' . $backupFilename);
+        echo "<script>alert('Events erfolgreich gespeichert!');</script>";
+    }
+    // Events speichern
+    if (file_put_contents($filepath, json_encode($events, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
+        echo "<script>alert('Fehler beim Speichern der Datei!');</script>";
+    }
 }
 ?>
 
@@ -86,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
 <body>
     <h1>Events Editor</h1>
 
+    <!-- Event-Editor UI: Eingabefelder und Event-Liste -->
     <div id="editor">
         <div class="input-group">
             <label for="event-date">Datum:</label>
@@ -103,16 +133,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
             <label for="event-link">Link:</label>
             <input type="text" id="event-link" />
         </div>
+
         <div class="input-group">
             <label for="event-color">Hintergrundfarbe:</label>
-            <input type="color" id="event-color" />
+            <input type="color" id="event-color" value="#000000" />
         </div>
         <div class="input-group">
             <label for="event-txtcolor">Schriftfarbe:</label>
-            <input type="color" id="event-txtcolor" />
+            <input type="color" id="event-txtcolor" value="#ffffff" />
         </div>
-        <button onclick="addEvent()">Event hinzufügen</button>
-        <button onclick="downloadEvents()">Download</button>
+
+        <div class="input-group">
+            <label for="event-filename">Dateiname (z.B. events2026.json):</label>
+            <input type="text" id="event-filename" value="events.json" />
+        </div>
+        <button type="button" onclick="addEvent()">Event hinzufügen</button>
+        <button type="button" onclick="downloadEvents()">Download</button>
+        <button type="button" onclick="saveEvents()">Speichern</button>
 
         <div class="event-list" id="event-list"></div>
 
@@ -122,14 +159,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
     </div>
 
     <script>
+        // JavaScript: Event-Verwaltung und UI-Funktionen
+        // events-Array hält alle geladenen und hinzugefügten Events
         let events = [];
 
+        // Events aus der JSON-Datei laden und anzeigen (Dateiname wählbar)
         async function fetchEvents() {
-            const response = await fetch('calendar/events.json');
-            events = await response.json();
+            const filename = document.getElementById('event-filename').value || 'events.json';
+            try {
+                const response = await fetch('calendar/' + filename);
+                events = await response.json();
+            } catch (e) {
+                events = [];
+            }
             displayEvents();
         }
 
+        // Events in der UI anzeigen
         function displayEvents() {
             const eventList = document.getElementById('event-list');
             eventList.innerHTML = '';
@@ -149,6 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
             });
         }
 
+        // Neues Event aus den Eingabefeldern hinzufügen
         function addEvent() {
             const date = document.getElementById('event-date').value;
             const image = document.getElementById('event-image').value;
@@ -158,37 +205,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
             const txtcolor = document.getElementById('event-txtcolor').value;
 
             if (date && texts.length > 0 && link) {
-                events.push({ date, image, texts, link, color, txtcolor });
+                // Prüfen, ob ein Event mit dem gleichen Datum existiert
+                const index = events.findIndex(event => event.date === date);
+                const newEvent = { date, image, texts, link, color, txtcolor };
+                if (index !== -1) {
+                    // Event ersetzen
+                    events[index] = newEvent;
+                } else {
+                    // Neues Event anhängen
+                    events.push(newEvent);
+                }
+                // Nach Datum sortieren (aufsteigend)
+                events.sort((a, b) => a.date.localeCompare(b.date));
                 displayEvents();
             } else {
                 alert('Bitte alle Felder ausfüllen.');
             }
         }
 
+        // Event aus der Liste löschen
         function deleteEvent(index) {
             events.splice(index, 1);
             displayEvents();
         }
 
+        // Hilfsfunktion: JSON formatieren
         function formatJSON(json) {
             return JSON.stringify(json, null, 2);
         }
 
+        // Events als Datei herunterladen
+
+        // Events als Datei herunterladen (Dateiname wählbar)
         function downloadEvents() {
+            const filename = document.getElementById('event-filename').value || 'events.json';
             const formattedEvents = formatJSON(events);
             const blob = new Blob([formattedEvents], { type: 'application/json' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'calendar/events.json';
+            link.download = 'calendar/' + filename;
             link.click();
         }
 
+        // Events an den Server senden und speichern (optional)
+
+        // Events an den Server senden und speichern (Dateiname wählbar)
         async function saveEvents() {
+            const filename = document.getElementById('event-filename').value || 'events.json';
             const formattedEvents = formatJSON(events);
             const formData = new FormData();
             formData.append('events', formattedEvents);
+            formData.append('filename', filename);
 
-            const response = await fetch('editor.php', {
+            const response = await fetch('eventedit.php', {
                 method: 'POST',
                 body: formData
             });
@@ -200,7 +269,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['events'])) {
             }
         }
 
+        // Nach dem Laden der Seite Events laden
         document.addEventListener('DOMContentLoaded', fetchEvents);
+        document.getElementById('event-filename').addEventListener('change', fetchEvents);
     </script>
 </body>
 </html>
