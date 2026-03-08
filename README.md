@@ -89,5 +89,7 @@ Die Datei `env.php` enthält alle sensiblen Zugangsdaten und Umgebungsvariablen 
     partner = ${Const|BaseURL}/oswebinterface/partner.php
     GridStatus = ${Const|BaseURL}/oswebinterface/gridstatus.php
     GridStatusRSS = ${Const|BaseURL}/oswebinterface/gridstatusrss.php
+    web_profile_url = "${Const|BaseURL}/oswebinterface/viewerfeed.php?name=[AGENT_NAME]"
 
   ---
+
